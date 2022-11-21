@@ -19,7 +19,7 @@ export interface CSSStyleVariable {
 /**
  * CSS 样式类型
  */
-export class CSSStyleType<T extends Record<string, CSSStyleVariable>> {
+export class CSSStyleType {
   /**
    * 名称
    */
@@ -33,9 +33,9 @@ export class CSSStyleType<T extends Record<string, CSSStyleVariable>> {
   /**
    * 类型样式映射
    */
-  map: T;
+  map: Record<string, CSSStyleVariable>;
 
-  constructor(name: string, code: string, map: T) {
+  constructor(name: string, code: string, map: Record<string, CSSStyleVariable>) {
     this.name = name;
     this.code = code;
     this.map = map;
@@ -51,7 +51,7 @@ export class CSSStyleType<T extends Record<string, CSSStyleVariable>> {
   /**
    * 获取某一类型变量
    */
-  get(code: keyof T | (string & Record<never, never>)) {
+  get(code: string) {
     return this.map[code];
   }
 
@@ -59,20 +59,20 @@ export class CSSStyleType<T extends Record<string, CSSStyleVariable>> {
    * 创建类型变量
    */
   create(name: string, code: string, value: string) {
-    this.map[code as keyof T] = { name, code, value } as any;
+    this.map[code] = { name, code, value };
   }
 
   /**
    * 删除类型变量
    */
-  delete(code: keyof T | (string & Record<never, never>)) {
+  delete(code: string) {
     delete this.map[code];
   }
 
   /**
    * 修改类型变量
    */
-  change(code: keyof T | (string & Record<never, never>), value: string) {
+  change(code: string, value: string) {
     this.map[code].value = value;
   }
 }
@@ -80,9 +80,7 @@ export class CSSStyleType<T extends Record<string, CSSStyleVariable>> {
 /**
  * CSS 样式
  */
-export class CSSStyle<
-  T extends Record<string, { name: string; code: string; variables: Record<string, CSSStyleVariable> }>
-> {
+export class CSSStyle<T extends string> {
   /**
    * 名称
    */
@@ -97,33 +95,40 @@ export class CSSStyle<
    * 样式映射
    */
   map: {
-    [K in keyof T]: CSSStyleType<
-      T extends Record<string, { name: string; code: string; variables: infer K }> ? K : void
-    >;
+    [K in T | (string & Record<never, never>)]: CSSStyleType;
   };
 
-  constructor(name: string, code: string, map: T) {
+  constructor(
+    name: string,
+    code: string,
+    map: {
+      [K in T]: {
+        name: string;
+        code: string;
+        variables: Record<string, CSSStyleVariable>;
+      };
+    }
+  ) {
     this.name = name;
     this.code = code;
     this.map = Object.keys(map).reduce((m, type) => {
-      m[type as keyof T] = new CSSStyleType(map[type].name, map[type].code, map[type].variables) as any;
+      const item = map[type as keyof typeof map] as any;
+      m[type] = new CSSStyleType(item.name, item.code, item.variables);
       return m;
-    }, {} as typeof this.map);
+    }, {} as any) as typeof this.map;
   }
 
   /**
    * 获取所有样式类型
    */
   getAll() {
-    return Object.values(this.map) as Array<
-      CSSStyleType<T extends Record<string, { name: string; code: string; variables: infer K }> ? K : void>
-    >;
+    return Object.values(this.map) as Array<CSSStyleType>;
   }
 
   /**
    * 获取某一样式类型
    */
-  get<K extends keyof T | (string & Record<never, never>)>(type: K): typeof this.map[K] {
+  get<K extends T | (string & Record<never, never>)>(type: K): CSSStyleType {
     return this.map[type];
   }
 
@@ -131,20 +136,20 @@ export class CSSStyle<
    * 创建样式类型
    */
   create(name: string, code: string, map: Record<string, CSSStyleVariable>) {
-    this.map[code as keyof T] = new CSSStyleType(name, code, map) as any;
+    this.map[code as T] = new CSSStyleType(name, code, map) as any;
   }
 
   /**
    * 删除样式类型
    */
-  delete(type: keyof T | (string & Record<never, never>)) {
+  delete(type: T | (string & Record<never, never>)) {
     delete this.map[type];
   }
 
   /**
    * 包裹样式类型
    */
-  parcel(type: keyof T | (string & Record<never, never>), value: string) {
+  parcel(type: T | (string & Record<never, never>), value: string) {
     return `*[ data-theme-${this.code} = '${String(type)}' ] {
 ${value}
 }`;
@@ -153,7 +158,7 @@ ${value}
   /**
    * 生成样式类型字符串
    */
-  toTypeString(type: keyof T | (string & Record<never, never>)) {
+  toTypeString(type: T | (string & Record<never, never>)) {
     return this.get(type)
       .getAll()
       .map(variable => `${variable.code}: ${variable.value};`)

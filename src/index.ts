@@ -2,7 +2,7 @@ import { CSSStyle } from './cssStyle';
 import { CSSSchema } from './cssSchema';
 import { StyleController } from './styleController';
 import { SchemaController } from './schemaController';
-import { ThemeConfig } from './types';
+import { ColorfullyConfig } from './types';
 
 export * from './cssStyle';
 export * from './cssSchema';
@@ -108,7 +108,7 @@ export class Colorfully<
   /**
    * 导入配置
    */
-  importConfig(conf: ThemeConfig) {
+  importConfig(conf: ColorfullyConfig) {
     const { styles, schemas } = conf;
 
     for (const style of styles) {
@@ -140,7 +140,7 @@ export class Colorfully<
    * 导出配置
    */
   exportConfig() {
-    const conf: ThemeConfig = {
+    const conf: ColorfullyConfig = {
       styles: this.style.getAll().map(style => ({
         name: style.name,
         code: style.code,

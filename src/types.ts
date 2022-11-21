@@ -1,7 +1,7 @@
 /**
  * 主题配置
  */
-export interface ThemeConfig {
+export interface ColorfullyConfig {
   /**
    * 样式
    */
