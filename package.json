@@ -1,0 +1,61 @@
+{
+  "name": "colorfully",
+  "version": "0.0.0",
+  "description": "Use Colorfully to define your interface!",
+  "keywords": [
+    "theme",
+    "javascript",
+    "typescript",
+    "css"
+  ],
+  "author": {
+    "name": "City",
+    "email": "city@nanzc.com",
+    "url": "https://nanzc.com"
+  },
+  "license": "MIT",
+  "main": "es/index.js",
+  "module": "es/index.js",
+  "unpkg": "dist/index.min.js",
+  "types": "es/index.d.ts",
+  "files": [
+    "dist",
+    "es"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnCIity/colorfully.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AnCIity/colorfully/issues"
+  },
+  "homepage": "https://github.com/AnCIity/colorfully#readme",
+  "devDependencies": {
+    "@lough/build-cli": "^0.0.6",
+    "@lough/commitlint-config": "^0.1.2",
+    "@lough/eslint-config": "^0.1.2",
+    "husky": "^7.0.2",
+    "lint-staged": "^11.1.2",
+    "prettier": "^2.7.1",
+    "typescript": "^4.6.4"
+  },
+  "scripts": {
+    "build": "lough-build",
+    "prepublishOnly": "npm run build",
+    "lint:es": "eslint -c .eslintrc.js --ext .ts,.tsx ./",
+    "lint:es-fix": "eslint --fix -c .eslintrc.js --ext .ts,.tsx ./",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint -c .eslintrc.js --ext .ts,.tsx"
+    ],
+    "*.{css,less,scss,styl}": [
+      "stylelint --config .stylelintrc.js *.{css,less,scss,styl}"
+    ]
+  }
+}
