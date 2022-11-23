@@ -25,6 +25,11 @@ export interface ThemeParameters<StyleMap, SchemaMap> {
    * @default "css"
    */
   mode?: 'css' | 'js';
+  /**
+   * 主题根节点
+   * @default html
+   */
+  root?: HTMLElement;
 }
 
 /**
@@ -48,7 +53,16 @@ export class Colorfully<
       ...(schemaMap || {})
     } as SchemaMap);
 
-    this.options = { mode: options.mode || 'css' };
+    this.options = { mode: options.mode || 'css', root: options.root || document.querySelector('html')! };
+  }
+
+  /**
+   * 派生类
+   */
+  derive(params: Omit<ThemeParameters<StyleMap, SchemaMap>, 'styleMap' | 'schemaMap' | 'mode'>) {
+    const colorfully = new Colorfully<StyleMap, SchemaMap>({ ...this.options, ...params });
+    colorfully.importConfig(this.exportConfig());
+    return colorfully;
   }
 
   private createStyleTag(styleList: ReturnType<typeof this.style.toStyleList>) {
@@ -70,7 +84,7 @@ export class Colorfully<
     /* 添加 html 主题属性 */
     const theme = this.schema.get(themeCode);
 
-    const html = document.querySelector('html');
+    const html = this.options.root;
 
     html?.getAttributeNames().forEach(name => {
       if (name.includes('data-theme-')) html.removeAttribute(name);
