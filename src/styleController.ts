@@ -1,5 +1,5 @@
 import { CSSSchema } from './cssSchema';
-import { CSSStyle } from './cssStyle';
+import { CSSStyle, CSSStyleVariable } from './cssStyle';
 
 export class StyleController<T extends Record<string, CSSStyle<any>>> {
   /**
@@ -28,7 +28,18 @@ export class StyleController<T extends Record<string, CSSStyle<any>>> {
   /**
    * 创建样式
    */
-  create(name: string, code: string, map: T extends Record<string, CSSStyle<infer MAP>> ? MAP : void) {
+  create(
+    name: string,
+    code: string,
+    map: Record<
+      string,
+      {
+        name: string;
+        code: string;
+        variables: Record<string, CSSStyleVariable>;
+      }
+    >
+  ) {
     this.map[code as keyof T] = new CSSStyle(name, code, map) as any;
   }
 

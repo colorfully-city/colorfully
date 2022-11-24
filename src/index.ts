@@ -61,7 +61,7 @@ export class Colorfully<
    */
   derive(params: Omit<ThemeParameters<StyleMap, SchemaMap>, 'styleMap' | 'schemaMap' | 'mode'>) {
     const colorfully = new Colorfully<StyleMap, SchemaMap>({ ...this.options, ...params });
-    colorfully.importConfig(this.exportConfig());
+    colorfully.import(this.export());
     return colorfully;
   }
 
@@ -122,7 +122,7 @@ export class Colorfully<
   /**
    * 导入配置
    */
-  importConfig(conf: ColorfullyConfig) {
+  import(conf: ColorfullyConfig) {
     const { styles, schemas } = conf;
 
     for (const style of styles) {
@@ -153,7 +153,7 @@ export class Colorfully<
   /**
    * 导出配置
    */
-  exportConfig() {
+  export() {
     const conf: ColorfullyConfig = {
       styles: this.style.getAll().map(style => ({
         name: style.name,

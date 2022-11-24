@@ -1,11 +1,7 @@
-# `styles`
+# Colorfully
 
-> TODO: description
+> Use Colorfully to define your interface theme!
 
-## Usage
+## Feature
 
-```
-const styles = require('styles');
-
-// TODO: DEMONSTRATE API
-```
+>
