@@ -14,13 +14,14 @@
     "url": "https://nanzc.com"
   },
   "license": "MIT",
-  "main": "es/index.js",
+  "main": "lib/index.js",
   "module": "es/index.js",
   "unpkg": "dist/index.min.js",
   "types": "es/index.d.ts",
   "files": [
     "dist",
-    "es"
+    "es",
+    "lib"
   ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
