@@ -53,7 +53,7 @@ export class Colorfully<
       ...(schemaMap || {})
     } as SchemaMap);
 
-    this.options = { mode: options.mode || 'css', root: options.root || document.querySelector('html')! };
+    this.options = { mode: options.mode || 'css', root: options.root };
   }
 
   /**
@@ -84,7 +84,7 @@ export class Colorfully<
     /* 添加 html 主题属性 */
     const theme = this.schema.get(themeCode);
 
-    const html = this.options.root;
+    const html = this.options.root || document.querySelector('html')!;
 
     html?.getAttributeNames().forEach(name => {
       if (name.includes('data-theme-')) html.removeAttribute(name);
