@@ -13,6 +13,7 @@ Colorfully 的核心功能就是使用 `JavaScript` 控制 `CSS Variable` 以及
 - 激发：**自定义主题包**
 - 友好：**`TypeScript` 类型支持**、**`CSS Variable` 智能提示**
 - 迅速：**快速接入主流组件库**、**脚手架快速创建主题包**
+- 包容：**小程序支持**、**自定义渲染**
 
 
 
@@ -358,6 +359,66 @@ theme.use('default')
 
 
 
+#### 使用参数
+
+> 如果你在 `new Colorfully` 时未传入 `UseParams` 或你使用的是主题包时，可以使用 `theme.updateDefaultUseParams` 更新你的 `UseParams`。
+
+`UseParams` 具体参数如下：
+
+```typescript
+/**
+ * 使用参数
+ */
+export interface UseParams {
+  /**
+   * 主题根节点
+   * @default html
+   * @description 也是选择器的挂载点。
+   */
+  root?: HTMLElement;
+  /**
+   * 模式
+   * @default "css"
+   * @description ‘css’ 模式也就是 'all in' 所有 css 都会提前生成挂载，'js' 模式也就是 'Import on demand' 所有的 css 都会被 js 按需导入。
+   */
+  mode?: 'css' | 'js';
+  /**
+   * 选择器模式
+   * @description 决定挂载器是属性模式还是类名模式。
+   */
+  selectorMode?: 'attr' | 'class';
+  /**
+   * 自定义挂载
+   * @description 对不支持 dom 操作的情况提供自定义渲染支持。
+   */
+  customMount?: {
+    /**
+     * 选择器
+     * @param themeMap { groupCode: typeCode }
+     */
+    selector: (themeMap: Record<string, string>) => void;
+    /**
+     * 样式
+     * @param styleList 样式列表
+     */
+    style: (
+      styleList: {
+        code: string;
+        css: string;
+        /**
+         * mode === 'js' 时才会有
+         */
+        variables?: Array<CSSStyleVariable>;
+      }[]
+    ) => void;
+  };
+}
+```
+
+通过上述属性达到更高的兼容性以及扩展性。
+
+
+
 ## 场景
 
 接下来给出不同场景下的，解决方案。
@@ -491,6 +552,22 @@ export const color = new ColorCSSStyle('色彩', 'color', {
 
 虽然 `default` 的 `variables` 值为空对象，但是这并不影响其 `CSS` 样式的生成，因为我们已经改写了 `color` 的 `parcel` 方法，使其检测到类型为 `default` 时，自动生成自适应的 `@media` 选择器。
 
+> 以上方案在不复杂的场景下适用。
+>
+> 但是由于配置的自由度比较高，所以在我们重新创建 `CSSStyle` 后，我们使用的并不是 `ColorCSSStyle`，这会带来一定的问题。
+>
+> 因此我们内置了它，当 `type` 为 `default` 时，且 `variables` 为 `{}`，我们将会在内部为你自动提供媒体查询功能。
+
+可直接写为：
+
+```typescript
+export const color = new CSSStyle('色彩', 'color', {
+	default: { name: '默认', code: 'default', variables: {} },
+    light: {/*...*/},
+    dark: {/*...*/},
+})
+```
+
 
 
 ### 范围主题
@@ -501,15 +578,60 @@ export const color = new ColorCSSStyle('色彩', 'color', {
 
 我们只需要给使用范围指定主题的元素加上 `data-theme-color` 属性并给到指定值 `dark` 就可以指定其 `color` 样式为深色。
 
-这是基础的控制，那么我们可以像 `theme` 一样管理它吗？
+**Q**：这是基础的控制，那么我们可以像 `theme` 一样管理它吗？
 
-也是可以的，你只需要初始化一个新的 `Colorfully` 并且传递其 `root` 参数为你需要使用范围主题的元素就可以了。
+**A**：也是可以的，你只需要初始化一个新的 `Colorfully` 并且传递其 `root` 参数为你需要使用范围主题的元素就可以了。
 
 如果你不想再重新设置一遍，也可以直接从 `theme` 中使用 `theme.derive` 方法派生出一个实例，同样的你也需要指定其 `root` 参数。
 
 ```typescript
 theme.derive({ root: dom });
 ```
+
+
+
+### 支持小程序
+
+**Q**：小程序如何使用 `Colorfully` 呢？
+
+**A**：由于小程序不支持操作 `dom`，所以我们只能通过 `data` 配合自定义渲染的形式进行挂载。
+
+这里使用微信小程序简单示例一下。
+
+首先我们创建 `selector`、`style` 两个 `data`，并将他们分别挂载在标签的 `class` 以及 `style` 属性上，然后通过 `theme.updateDefaultUseParams` 进行自定义渲染配置。
+
+```typescript
+onLoad() {
+    let _this = this
+
+    theme.updateDefaultUseParams({
+        "mode": 'js',
+        "selectorMode": 'class',
+        "customMount": {
+            "selector": (themeMap) => {
+                _this.selector = Object.keys(themeMap).map(code => `data-theme-${code}-${themeMap[code]}`).join(' ')
+                _this.$apply();
+            },
+            "style": (styleList) => {
+                let css = ''
+                styleList.forEach(style => {
+                    style.variables.forEach(variable => {
+                        css += `${variable.code}: ${variable.value};`
+                    })
+                })
+                _this.style = css
+                _this.$apply();
+            }
+        }
+    })
+
+    theme.use('light')
+}
+```
+
+这样我们就算是接入了 `Colorfully` 的主题管理系统了。
+
+对于小程序的监听系统主题改变，可以使用 `wx.onThemeChange` 方法自行实现。
 
 
 
@@ -543,9 +665,31 @@ theme.derive({ root: dom });
 
 ## 接口
 
-
-
 这里不介绍具体 `API` 了，`TypeScript` 开发的懂得都懂，且以上示例比较全面。
+
+
+
+### ThemeParameters
+
+```typescript
+/**
+ * 主题参数
+ */
+export interface ThemeParameters<StyleMap, SchemaMap> {
+  /**
+   * 样式配置图
+   */
+  styleMap?: StyleMap;
+  /**
+   * 主题配置图
+   */
+  schemaMap?: SchemaMap;
+  /**
+   * 默认使用参数
+   */
+  defaultUseParams?: UseParams;
+}
+```
 
 
 

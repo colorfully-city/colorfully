@@ -1,4 +1,4 @@
-import { CSSStyle } from './cssStyle';
+import { CSSStyle, CSSStyleVariable } from './cssStyle';
 import { CSSSchema } from './cssSchema';
 import { StyleController } from './styleController';
 import { SchemaController } from './schemaController';
@@ -7,6 +7,54 @@ import { ColorfullyConfig } from './types';
 export * from './cssStyle';
 export * from './cssSchema';
 export * from './types';
+
+/**
+ * 使用参数
+ */
+export interface UseParams {
+  /**
+   * 主题根节点
+   * @default html
+   * @description 也是选择器的挂载点。
+   */
+  root?: HTMLElement;
+  /**
+   * 模式
+   * @default "css"
+   * @description ‘css’ 模式也就是 'all in' 所有 css 都会提前生成挂载，'js' 模式也就是 'Import on demand' 所有的 css 都会被 js 按需导入。
+   */
+  mode?: 'css' | 'js';
+  /**
+   * 选择器模式
+   * @description 决定挂载器是属性模式还是类名模式。
+   */
+  selectorMode?: 'attr' | 'class';
+  /**
+   * 自定义挂载
+   * @description 对不支持 dom 操作的情况提供自定义渲染支持。
+   */
+  customMount?: {
+    /**
+     * 选择器
+     * @param themeMap { groupCode: typeCode }
+     */
+    selector: (themeMap: Record<string, string>) => void;
+    /**
+     * 样式
+     * @param styleList 样式列表
+     */
+    style: (
+      styleList: {
+        code: string;
+        css: string;
+        /**
+         * mode === 'js' 时才会有
+         */
+        variables?: Array<CSSStyleVariable>;
+      }[]
+    ) => void;
+  };
+}
 
 /**
  * 主题参数
@@ -21,15 +69,9 @@ export interface ThemeParameters<StyleMap, SchemaMap> {
    */
   schemaMap?: SchemaMap;
   /**
-   * 模式
-   * @default "css"
+   * 默认使用参数
    */
-  mode?: 'css' | 'js';
-  /**
-   * 主题根节点
-   * @default html
-   */
-  root?: HTMLElement;
+  defaultUseParams?: UseParams;
 }
 
 /**
@@ -53,13 +95,22 @@ export class Colorfully<
       ...(schemaMap || {})
     } as SchemaMap);
 
-    this.options = { mode: options.mode || 'css', root: options.root };
+    this.options = {
+      defaultUseParams: { mode: 'css', selectorMode: 'attr', ...(options.defaultUseParams || {}) }
+    };
+  }
+
+  /**
+   * 更新默认使用参数
+   */
+  updateDefaultUseParams(params: UseParams) {
+    this.options.defaultUseParams = { ...this.options.defaultUseParams, ...params };
   }
 
   /**
    * 派生类
    */
-  derive(params: Omit<ThemeParameters<StyleMap, SchemaMap>, 'styleMap' | 'schemaMap' | 'mode'>) {
+  derive(params: Omit<ThemeParameters<StyleMap, SchemaMap>, 'styleMap' | 'schemaMap'>) {
     const colorfully = new Colorfully<StyleMap, SchemaMap>({ ...this.options, ...params });
     colorfully.import(this.export());
     return colorfully;
@@ -81,42 +132,63 @@ export class Colorfully<
    * 使用主题
    */
   use(themeCode: keyof SchemaMap | (string & Record<never, never>)) {
+    const params = { ...this.options.defaultUseParams };
+
     /* 添加 html 主题属性 */
     const theme = this.schema.get(themeCode);
 
-    const html = this.options.root || document.querySelector('html')!;
+    if (params.customMount?.selector) {
+      params.customMount.selector(theme.map);
+    } else {
+      const html = params.root || document.querySelector('html')!;
 
-    html?.getAttributeNames().forEach(name => {
-      if (name.includes('data-theme-')) html.removeAttribute(name);
-    });
+      if (params.selectorMode === 'attr')
+        html?.getAttributeNames().forEach(name => {
+          if (name.includes('data-theme-')) html.removeAttribute(name);
+        });
+      else
+        Array.from(html?.classList).forEach(name => {
+          if (name.includes('data-theme-')) html.classList.remove(name);
+        });
 
-    Object.keys(theme.map).forEach(styleCode => {
-      const styleType = theme.map[styleCode];
-      html?.setAttribute(`data-theme-${styleCode}`, styleType as string);
-    });
+      Object.keys(theme.map).forEach(styleGroupCode => {
+        const styleTypeCode = theme.map[styleGroupCode];
+        if (params.selectorMode === 'attr') html?.setAttribute(`data-theme-${styleGroupCode}`, styleTypeCode as string);
+        else html?.classList.add(`data-theme-${styleGroupCode}-${styleTypeCode}`);
+      });
+    }
 
-    if (this.options.mode === 'css' && this.init) return;
+    if (params.mode === 'css' && this.init) return;
     this.init = true;
-    const oldTagList = Array.from(document.querySelectorAll('style[data-theme-style]'));
 
-    if (this.options.mode === 'css') {
-      const styleList = this.style.toStyleList();
+    if (params.mode === 'css') {
+      const styleList = this.style.toStyleList(params.selectorMode!);
+      if (params.customMount?.style) {
+        params.customMount.style(styleList);
+      } else {
+        const oldTagList = Array.from(document.querySelectorAll('style[data-theme-style]'));
+        const styleTagList = this.createStyleTag(styleList);
+        const head = document.querySelector('head');
+        // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+        const firstStyleDom = head?.querySelector('style')!;
+        styleTagList.forEach(tag => head?.insertBefore(tag, firstStyleDom));
+        oldTagList.forEach(e => e.parentElement?.removeChild(e));
+      }
+      return;
+    }
+
+    const styleList = this.style.toStyleListByTheme(theme, params.selectorMode!);
+    if (params.customMount?.style) {
+      params.customMount.style(styleList);
+    } else {
+      const oldTagList = Array.from(document.querySelectorAll('style[data-theme-style]'));
       const styleTagList = this.createStyleTag(styleList);
       const head = document.querySelector('head');
       // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
       const firstStyleDom = head?.querySelector('style')!;
       styleTagList.forEach(tag => head?.insertBefore(tag, firstStyleDom));
       oldTagList.forEach(e => e.parentElement?.removeChild(e));
-      return;
     }
-
-    const styleList = this.style.toStyleListByTheme(theme);
-    const styleTagList = this.createStyleTag(styleList);
-    const head = document.querySelector('head');
-    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-    const firstStyleDom = head?.querySelector('style')!;
-    styleTagList.forEach(tag => head?.insertBefore(tag, firstStyleDom));
-    oldTagList.forEach(e => e.parentElement?.removeChild(e));
   }
 
   /**

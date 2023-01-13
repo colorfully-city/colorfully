@@ -149,8 +149,43 @@ export class CSSStyle<T extends string> {
   /**
    * 包裹样式类型
    */
-  parcel(type: T | (string & Record<never, never>), value: string) {
+  parcelToAttr(type: T | (string & Record<never, never>), value: string) {
+    if (type === 'default' && !value) {
+      return this.getAll()
+        .filter(type => type.code !== 'default')
+        .map(
+          type => `@media (prefers-color-scheme: ${type.code}) {
+*[ data-theme-${this.code} = 'default' ] {
+${this.toString(type.code)}
+}
+}`
+        )
+        .join('\n');
+    }
+
     return `*[ data-theme-${this.code} = '${String(type)}' ] {
+${value}
+}`;
+  }
+
+  /**
+   * 包裹样式类型-类名
+   */
+  parcelToClass(type: T | (string & Record<never, never>), value: string) {
+    if (type === 'default' && !value) {
+      return this.getAll()
+        .filter(type => type.code !== 'default')
+        .map(
+          type => `@media (prefers-color-scheme: ${type.code}) {
+*.data-theme-${this.code}-default {
+${this.toString(type.code)}
+}
+}`
+        )
+        .join('\n');
+    }
+
+    return `*.data-theme-${this.code}-${String(type)} {
 ${value}
 }`;
   }
@@ -158,7 +193,7 @@ ${value}
   /**
    * 生成样式类型字符串
    */
-  toTypeString(type: T | (string & Record<never, never>)) {
+  toString(type: T | (string & Record<never, never>)) {
     return this.get(type)
       .getAll()
       .map(variable => `${variable.code}: ${variable.value};`)
@@ -166,11 +201,9 @@ ${value}
   }
 
   /**
-   * 生成样式字符串
+   * 生成样式类型字符串列表
    */
-  toString() {
-    return this.getAll()
-      .map(type => this.parcel(type.code, this.toTypeString(type.code)))
-      .join('\n\n');
+  toAllString() {
+    return this.getAll().map(type => ({ code: type.code, css: this.toString(type.code) }));
   }
 }

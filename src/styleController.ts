@@ -50,17 +50,27 @@ export class StyleController<T extends Record<string, CSSStyle<any>>> {
     delete this.map[code];
   }
 
-  toStyleListByTheme(theme: CSSSchema<any>) {
-    return Object.keys(theme.map).map(group => ({
-      code: group,
-      css: this.map[group].parcel(theme.map[group], this.map[group].toTypeString(theme.map[group]))
+  toStyleListByTheme(theme: CSSSchema<any>, selectorMode: 'attr' | 'class') {
+    return Object.keys(theme.map).map(code => ({
+      code: code,
+      css: (selectorMode === 'attr' ? this.map[code].parcelToAttr : this.map[code].parcelToClass).call(
+        this.map[code],
+        theme.map[code],
+        this.map[code].toString(theme.map[code])
+      ),
+      variables: this.map[code].get(theme.map[code]).getAll()
     }));
   }
 
-  toStyleList() {
+  toStyleList(selectorMode: 'attr' | 'class') {
     return Object.values(this.map).map(group => ({
       code: group.code,
-      css: group.toString()
+      css: group
+        .toAllString()
+        .map(type =>
+          (selectorMode === 'attr' ? group.parcelToAttr : group.parcelToClass).call(group, type.code, type.css)
+        )
+        .join('\n\n')
     }));
   }
 }
