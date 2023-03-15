@@ -17,9 +17,9 @@ export interface CSSStyleVariable {
 }
 
 /**
- * CSS 样式类型
+ * CSS 样式种类
  */
-export class CSSStyleType {
+export class CSSStyleKind {
   /**
    * 名称
    */
@@ -80,7 +80,21 @@ export class CSSStyleType {
 /**
  * CSS 样式
  */
-export class CSSStyle<T extends string> {
+export class CSSStyle<
+  T extends string,
+  Map extends {
+    [K in T]: {
+      name: string;
+      code: string;
+      variables: Record<string, CSSStyleVariable>;
+    };
+  },
+  MM extends {
+    [K in keyof Map]: {
+      [P in keyof Map[K]['variables']]: Map[K]['variables'][P]['value'];
+    };
+  }
+> {
   /**
    * 名称
    */
@@ -95,25 +109,19 @@ export class CSSStyle<T extends string> {
    * 样式映射
    */
   map: {
-    [K in T | (string & Record<never, never>)]: CSSStyleType;
+    [K in T | (string & Record<never, never>)]: CSSStyleKind;
   };
 
-  constructor(
-    name: string,
-    code: string,
-    map: {
-      [K in T]: {
-        name: string;
-        code: string;
-        variables: Record<string, CSSStyleVariable>;
-      };
-    }
-  ) {
+  getC() {
+    return {} as MM;
+  }
+
+  constructor(name: string, code: string, map: Map) {
     this.name = name;
     this.code = code;
     this.map = Object.keys(map).reduce((m, type) => {
       const item = map[type as keyof typeof map] as any;
-      m[type] = new CSSStyleType(item.name, item.code, item.variables);
+      m[type] = new CSSStyleKind(item.name, item.code, item.variables);
       return m;
     }, {} as any) as typeof this.map;
   }
@@ -122,13 +130,13 @@ export class CSSStyle<T extends string> {
    * 获取所有样式类型
    */
   getAll() {
-    return Object.values(this.map) as Array<CSSStyleType>;
+    return Object.values(this.map) as Array<CSSStyleKind>;
   }
 
   /**
    * 获取某一样式类型
    */
-  get<K extends T | (string & Record<never, never>)>(type: K): CSSStyleType {
+  get<K extends T | (string & Record<never, never>)>(type: K): CSSStyleKind {
     return this.map[type];
   }
 
@@ -136,7 +144,7 @@ export class CSSStyle<T extends string> {
    * 创建样式类型
    */
   create(name: string, code: string, map: Record<string, CSSStyleVariable>) {
-    this.map[code as T] = new CSSStyleType(name, code, map) as any;
+    this.map[code as T] = new CSSStyleKind(name, code, map) as any;
   }
 
   /**

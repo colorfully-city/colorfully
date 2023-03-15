@@ -8,10 +8,16 @@ export * from './cssStyle';
 export * from './cssSchema';
 export * from './types';
 
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void ? I : never;
+
+type ExtractVariableMap<T extends Record<string, CSSStyle<any, any, any>>> = {
+  [K in keyof T]: T[K] extends CSSStyle<infer U, infer Map, infer MM> ? UnionToIntersection<MM[keyof MM]> : never;
+};
+
 /**
  * 使用参数
  */
-export interface UseParams {
+export interface UseParams<StyleMap extends Record<string, CSSStyle<any, any, any>>> {
   /**
    * 主题根节点
    * @default html
@@ -51,7 +57,11 @@ export interface UseParams {
          * mode === 'js' 时才会有
          */
         variables?: Array<CSSStyleVariable>;
-      }[]
+      }[],
+      /**
+       * mode === 'js' 时才会有
+       */
+      styleMap?: ExtractVariableMap<StyleMap>
     ) => void;
   };
 }
@@ -59,7 +69,7 @@ export interface UseParams {
 /**
  * 主题参数
  */
-export interface ThemeParameters<StyleMap, SchemaMap> {
+export interface ThemeParameters<StyleMap extends Record<string, CSSStyle<any, any, any>>, SchemaMap> {
   /**
    * 样式配置图
    */
@@ -71,14 +81,14 @@ export interface ThemeParameters<StyleMap, SchemaMap> {
   /**
    * 默认使用参数
    */
-  defaultUseParams?: UseParams;
+  defaultUseParams?: UseParams<StyleMap>;
 }
 
 /**
  * 主题
  */
 export class Colorfully<
-  StyleMap extends Record<string, CSSStyle<any>>,
+  StyleMap extends Record<string, CSSStyle<any, any, any>>,
   SchemaMap extends Record<string, CSSSchema<any>>
 > {
   style;
@@ -103,7 +113,7 @@ export class Colorfully<
   /**
    * 更新默认使用参数
    */
-  updateDefaultUseParams(params: UseParams) {
+  updateDefaultUseParams(params: UseParams<StyleMap>) {
     this.options.defaultUseParams = { ...this.options.defaultUseParams, ...params };
   }
 
@@ -179,7 +189,14 @@ export class Colorfully<
 
     const styleList = this.style.toStyleListByTheme(theme, params.selectorMode!);
     if (params.customMount?.style) {
-      params.customMount.style(styleList);
+      const styleMap = styleList.reduce((obj, cur) => {
+        obj[cur.code] = cur.variables.reduce((o, c) => {
+          o[c.code] = c.value;
+          return o;
+        }, {} as any);
+        return obj;
+      }, {} as any);
+      params.customMount.style(styleList, styleMap);
     } else {
       const oldTagList = Array.from(document.querySelectorAll('style[data-theme-style]'));
       const styleTagList = this.createStyleTag(styleList);

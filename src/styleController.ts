@@ -1,11 +1,11 @@
 import { CSSSchema } from './cssSchema';
 import { CSSStyle, CSSStyleVariable } from './cssStyle';
 
-export class StyleController<T extends Record<string, CSSStyle<any>>> {
+export class StyleController<T extends Record<string, CSSStyle<any, any, any>>> {
   /**
    * 样式图
    */
-  private map: T;
+  map: T;
 
   constructor(map: T) {
     this.map = map;
