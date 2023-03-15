@@ -369,49 +369,51 @@ theme.use('default')
 /**
  * 使用参数
  */
-export interface UseParams {
-  /**
-   * 主题根节点
-   * @default html
-   * @description 也是选择器的挂载点。
-   */
-  root?: HTMLElement;
-  /**
-   * 模式
-   * @default "css"
-   * @description ‘css’ 模式也就是 'all in' 所有 css 都会提前生成挂载，'js' 模式也就是 'Import on demand' 所有的 css 都会被 js 按需导入。
-   */
-  mode?: 'css' | 'js';
-  /**
-   * 选择器模式
-   * @description 决定挂载器是属性模式还是类名模式。
-   */
-  selectorMode?: 'attr' | 'class';
-  /**
-   * 自定义挂载
-   * @description 对不支持 dom 操作的情况提供自定义渲染支持。
-   */
-  customMount?: {
+export interface UseParams<StyleMap extends Record<string, CSSStyle<any, any, any>>> {
     /**
-     * 选择器
-     * @param themeMap { groupCode: typeCode }
+     * 主题根节点
+     * @default html
+     * @description 也是选择器的挂载点。
      */
-    selector: (themeMap: Record<string, string>) => void;
+    root?: HTMLElement;
     /**
-     * 样式
-     * @param styleList 样式列表
+     * 模式
+     * @default "css"
+     * @description ‘css’ 模式也就是 'all in' 所有 css 都会提前生成挂载，'js' 模式也就是 'Import on demand' 所有的 css 都会被 js 按需导入。
      */
-    style: (
-      styleList: {
-        code: string;
-        css: string;
+    mode?: 'css' | 'js';
+    /**
+     * 选择器模式
+     * @description 决定挂载器是属性模式还是类名模式。
+     */
+    selectorMode?: 'attr' | 'class';
+    /**
+     * 自定义挂载
+     * @description 对不支持 dom 操作的情况提供自定义渲染支持。
+     */
+    customMount?: {
+        /**
+         * 选择器
+         * @param themeMap { groupCode: typeCode }
+         */
+        selector: (themeMap: Record<string, string>) => void;
+        /**
+         * 样式
+         * @param styleList 样式列表
+         */
+        style: (styleList: {
+            code: string;
+            css: string;
+            /**
+             * mode === 'js' 时才会有
+             */
+            variables?: Array<CSSStyleVariable>;
+        }[], 
         /**
          * mode === 'js' 时才会有
          */
-        variables?: Array<CSSStyleVariable>;
-      }[]
-    ) => void;
-  };
+        styleMap?: ExtractVariableMap<StyleMap>) => void;
+    };
 }
 ```
 
@@ -632,6 +634,207 @@ onLoad() {
 这样我们就算是接入了 `Colorfully` 的主题管理系统了。
 
 对于小程序的监听系统主题改变，可以使用 `wx.onThemeChange` 方法自行实现。
+
+
+
+### 支持 React Native
+
+**Q**：`React Native` 如何使用 `Colorfully` 呢？
+
+**A**：在 `React Native` 中并没有 `CSS`，因为它采用的是类似CSS的概念，且只能从组件的 `style` 注入。我们可以将 `Colorfully` 的主题通过变量这个载体传入。
+
+接下来让我们看看如何实现吧。
+
+我们首先把 `style` 交给 `Mobx` 进行状态管理：
+
+```typescript
+import theme from '@pin-co/theme';
+import { makeAutoObservable, runInAction } from 'mobx';
+
+class ThemeStore {
+  // 推断 styleMap 类型
+  style = {} as Exclude<
+    Parameters<Exclude<Parameters<typeof theme.updateDefaultUseParams>['0']['customMount'], undefined>['style']>['1'],
+    undefined
+  >;
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  init() {
+    theme.updateDefaultUseParams({
+      mode: 'js',
+      customMount: {
+        selector: () => null,
+        style: (_, styleMap) => {
+          if (styleMap)
+            runInAction(() => {
+              this.style = styleMap;
+            });
+        }
+      }
+    });
+
+    theme.use('light');
+  }
+}
+
+const themeStore = new ThemeStore();
+
+export default themeStore;
+```
+
+我们在声明 `style` 时，给到它类型推断，这样你在使用 `style` 时就可以得到类型提示了。
+
+然后在组件中使用它：
+
+```react
+import React, { useEffect } from 'react';
+import { useColorScheme } from 'react-native';
+import theme from '@xxx/theme';
+import themeStore from './store/theme';
+
+// 初始化主题
+themeStore.init();
+
+export function App() {
+  const systemTheme = useColorScheme() ?? 'light';
+
+  useEffect(() => {
+    // 自适应系统深浅色主题
+    theme.use(systemTheme);
+  }, [systemTheme]);
+
+  return (
+    <View>
+      {/* 使用主题 */}
+      <Observer>
+          {() => 
+          	<Text style={{ color: themeStore.style.color['--color-text-primary'] }}>
+               测试
+           	</Text>
+          }
+      </Observer>
+    </View>
+  );
+}
+
+registerRootComponent(App);
+```
+
+这样就可以了，可以开心的使用 `Colorfully` 了。
+
+你一定很好奇为什么要这样写 `themeStore.style.color['--color-text-primary']`，其中 `color` 的 `key` 是你自己定义的。
+
+你可以在定义主题时这样写：
+
+```typescript
+import { CSSStyle } from 'colorfully';
+
+export const color = new CSSStyle('色彩', 'color', {
+    light: {
+        name: '浅色',
+        code: 'light',
+        variables: {
+            textPrimary: {
+                name: '',
+                code: '--color-text-primary',
+                value: '#262626'
+            },
+            ...{ /* more */}
+        }
+    },
+    dark: {
+        name: '深色',
+        code: 'dark',
+        variables: {
+            textPrimary: {
+                name: '',
+                code: '--color-text-primary',
+                value: '#dbdbdb'
+            },
+            ...{ /* more */}
+        }
+    }
+})
+```
+
+那么对于的使用：
+
+```react
+<Observer>
+    {() => 
+    <Text style={{ color: themeStore.style.color.textPrimary }}>
+         测试
+     </Text>
+    }
+</Observer>
+```
+
+这样看起来顺眼多了对吧。
+
+再告诉你一个小技巧，按照以下形式写将会得到类型提示的描述：
+
+```typescript
+import { CSSStyle } from 'colorfully';
+
+/**
+ * 样式变量
+ */
+export interface IStyleVariable<T = string> {
+  /**
+   * 名称
+   */
+  name: string;
+  /**
+   * 代码
+   */
+  code: string;
+  /**
+   * 值
+   */
+  value: T;
+}
+
+/**
+ * 颜色变量
+ */
+interface IColorVariable {
+  /**
+   * 主要文本
+   */
+  textPrimary: IStyleVariable;
+  [k: string]: any;
+}
+
+export const color = new CSSStyle('色彩', 'color', {
+  light: {
+    name: '浅色',
+    code: 'light',
+    variables: {
+      textPrimary: {
+        name: '',
+        code: '--color-text-primary',
+        value: '#262626'
+      }
+    } as IColorVariable
+  },
+  dark: {
+    name: '深色',
+    code: 'dark',
+    variables: {
+      textPrimary: {
+        name: '',
+        code: '--color-text-primary',
+        value: '#dbdbdb'
+      }
+    } as IColorVariable
+  }
+});
+```
+
+这样约束 `variables` 的同时，你也可以得到类型提示的描述了。
 
 
 
