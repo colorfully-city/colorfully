@@ -598,31 +598,23 @@ theme.derive({ root: dom });
 
 **A**：由于小程序不支持操作 `dom`，所以我们只能通过 `data` 配合自定义渲染的形式进行挂载。
 
-这里使用微信小程序简单示例一下。
-
-首先我们创建 `selector`、`style` 两个 `data`，并将他们分别挂载在标签的 `class` 以及 `style` 属性上，然后通过 `theme.updateDefaultUseParams` 进行自定义渲染配置。
+首先我们 `pageStyle` 一个 `data`，并将他挂载在标签的 `style` 属性上，然后通过 `theme.updateDefaultUseParams` 进行自定义渲染配置。
 
 ```typescript
 onLoad() {
-    let _this = this
-
     theme.updateDefaultUseParams({
         "mode": 'js',
         "selectorMode": 'class',
         "customMount": {
-            "selector": (themeMap) => {
-                _this.selector = Object.keys(themeMap).map(code => `data-theme-${code}-${themeMap[code]}`).join(' ')
-                _this.$apply();
-            },
+            "selector": _themeMap => {},
             "style": (styleList) => {
-                let css = ''
+                let pageStyle = '';
                 styleList.forEach(style => {
-                    style.variables.forEach(variable => {
-                        css += `${variable.code}: ${variable.value};`
-                    })
-                })
-                _this.style = css
-                _this.$apply();
+                    style.variables?.forEach(variable => {
+                        pageStyle += `${variable.code}: ${variable.value};`;
+                    });
+                });
+                this.setData({ pageStyle });
             }
         }
     })
@@ -634,6 +626,53 @@ onLoad() {
 这样我们就算是接入了 `Colorfully` 的主题管理系统了。
 
 对于小程序的监听系统主题改变，可以使用 `wx.onThemeChange` 方法自行实现。
+
+每个页面都这样，那可就太麻烦了，所以我们结合混入来快速实现每个页面同样一致的效果：
+
+```typescript
+Object.assign(globalThis, {
+    Page: function (params: Parameters<typeof Page>[0]) {
+        const onLoad = params.onLoad;
+
+        params.onLoad = function (...args) {
+            theme.updateDefaultUseParams({
+                mode: 'js',
+                selectorMode: 'class',
+                customMount: {
+                    selector: _themeMap => {},
+                    style: styleList => {
+                        let pageStyle = '';
+                        styleList.forEach(style => {
+                            style.variables?.forEach(variable => {
+                                pageStyle += `${variable.code}: ${variable.value};`;
+                            });
+                        });
+                        this.setData({ pageStyle });
+                    }
+                }
+            });
+
+            theme.use('light');
+
+            return onLoad?.call(this, ...args);
+        };
+
+        _Page(params);
+    }
+});
+```
+
+然后我们在首页引入这个混入操作，同时在需要使用  `CSS Variable` 的页面包裹一个：
+
+```html
+<page-meta page-style="{{pageStyle}}">
+    <view class="index">
+        
+    </view>
+</page-meta>
+```
+
+这样就达到了我们想要的效果。
 
 
 
@@ -648,7 +687,7 @@ onLoad() {
 我们首先把 `style` 交给 `Mobx` 进行状态管理：
 
 ```typescript
-import theme from '@pin-co/theme';
+import theme from '@xxx/theme';
 import { makeAutoObservable, runInAction } from 'mobx';
 
 class ThemeStore {
